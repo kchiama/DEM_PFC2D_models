@@ -1,7 +1,7 @@
 # DEM_PFC2D_models
 General code for DEM models using Particle Flow Code (PFC2D) v7.00. These models are part of the "Geomechanical modeling of ground surface deformation associated with thrust and reverse fault earthquakes: a discrete element approach" project. 
 
-README.txt
+#README.txt
 Each set of project files contains everything requried to reproduce a model in Particle Flow Code (PFC2D) version 7.00.152 or sooner. 
 The fish functions file defines each of the fish commands required for a model (e.g., defing the boundary conditions, generating pregrowth layers, making a fault, running the deformation sequence). 
 The parameter_def file contains each of the numerical parameters that are modified for each of the trials (e.g., model width, particle radii, cohesion and tensile strength of contact bonds, etc). 
