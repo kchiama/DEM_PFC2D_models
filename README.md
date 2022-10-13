@@ -1,6 +1,8 @@
 # DEM_PFC2D_models
 General code for DEM models using Particle Flow Code (PFC2D) v7.00. These models are part of the "Geomechanical modeling of ground surface deformation associated with thrust and reverse fault earthquakes: A discrete element approach" project. 
 
+You will need to download PFC2D v7.0 or later to open these files and obtain an Itasca license for the software to run models with > 1000 particles. 
+
 # README.txt
 Each set of project files contains everything required to reproduce a model in Particle Flow Code (PFC2D) version 7.00.152 or later. 
 The main project file (D5.prj) will open the required data files attached and contain a series of plots to visualize the model (generally the particles and contact bonds) in PFC2D. The models can be run from the command line or iPython console. 
