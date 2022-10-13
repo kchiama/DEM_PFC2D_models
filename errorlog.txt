@@ -1,0 +1,7 @@
+ 600-027
+Wed April 27 2022 at 19:37:13
+Module: C:\Program Files\Itasca\PFC600\exe64\pfc2d600_gui.exe
+GUI Version: 006-128
+Operating system: Microsoft Enterprise Edition (build 9200), 64-bit.
+16 processor(s), type 8664.
+

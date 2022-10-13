@@ -1,0 +1,166 @@
+; Every single parameter uses SI unit.
+
+; 'g_' prefix is for 'global' so I know that it is a global parameter that I defined.
+fish define allParameters
+
+    ; Export parameters
+    global g_export_during_deformation = true
+    global g_time_between_two_export = 500
+
+    ; Domain origin
+    global g_x_domain_origin = 0
+    global g_y_domain_origin = 0
+    
+    ; Position of the model origin relative to the domain origin
+    global g_x_positive_distance_from_domain_origin = 5
+    global g_y_positive_distance_from_domain_origin = g_x_positive_distance_from_domain_origin
+
+    ; Dimensions of the initial model (containing balls)
+    global g_x_model_length = 50
+    
+    ; model limits
+    global g_x_model_begin = g_x_domain_origin + g_x_positive_distance_from_domain_origin
+    global g_y_model_begin = g_y_domain_origin + g_y_positive_distance_from_domain_origin
+    global g_x_model_end = g_x_model_begin + g_x_model_length
+    
+    
+    ; Extra length beyond the model to define the limit of the domain
+    global g_x_extra_domain_length = g_x_positive_distance_from_domain_origin
+    
+    ; Domain limit
+    global g_x_domain_max = g_x_model_begin + g_x_model_length + g_x_extra_domain_length
+    
+    ; Definition of the fractional boundary
+    local x_length_fraction = 0.4
+    global g_x_piece_1_limit = g_x_model_begin + g_x_model_length * x_length_fraction
+    
+    ; Wall properties
+    global g_vertical_wall_x_begin_name = 'vertical_wall_x_begin'
+    global g_vertical_wall_x_end_name = 'vertical_wall_x_end'
+    global g_horizonal_wall_y_begin_part_near_x_begin_name = 'horizonal_wall_y_begin_part_near_x_begin'
+    global g_horizonal_wall_y_begin_part_near_x_end_name = 'horizonal_wall_y_begin_part_near_x_end'
+    global g_vertical_wall_x_begin_id = 1
+    global g_vertical_wall_x_end_id = 2
+    global g_horizonal_wall_y_begin_part_near_x_begin_id = 3
+    global g_horizonal_wall_y_begin_part_near_x_end_id = 4
+    global g_vertical_wall_x_begin_friction = 1.0
+    global g_vertical_wall_x_end_friction = 1.0
+    global g_horizonal_wall_y_begin_part_near_x_begin_friction = 1.0
+    global g_horizonal_wall_y_begin_part_near_x_end_friction = 1.0
+    
+    ; Layer parameters
+    global g_ball_density = 2600 
+    global g_radius_multiplier = 1
+    global g_ball_porosity = 0.2
+    global g_initial_ball_friction = 0.0
+    global g_nb_pre_growth_layers = 5
+    global g_ball_lower_radius_pre_growth = 0.025;m
+    global g_ball_upper_radius_pre_growth = 0.06625;m
+    global g_pre_growth_layer_thickness = 1
+    global g_pre_growth_ball_friction = 0.3
+    global g_pre_growth_total_thickness = g_pre_growth_layer_thickness * g_nb_pre_growth_layers
+    global g_ball_lower_radius_growth = g_ball_lower_radius_pre_growth
+    global g_ball_upper_radius_growth = g_ball_upper_radius_pre_growth
+    global g_growth_layer_thickness = 300
+    global g_growth_ball_friction = g_pre_growth_ball_friction
+    global g_nb_growth_layers = 0
+    global g_coef_to_be_a_litte_above_target_topo = 0.1
+    
+    global g_y_domain_max = g_y_model_begin + 10 * (g_nb_pre_growth_layers * g_pre_growth_layer_thickness + g_nb_growth_layers * g_growth_layer_thickness)
+    
+    ;Homogeneous Mechanical Properties
+        global g_pre_growth_pb_ten = 10e5
+        global g_pre_growth_pb_coh = 10e5
+        ;global g_growth_pb_ten = g_pre_growth_pb_ten
+        ;global g_growth_pb_coh = g_pre_growth_pb_coh
+        global g_pre_growth_bond_gap = g_ball_upper_radius_pre_growth/2
+        ;global g_growth_bond_gap = g_pre_growth_bond_gap
+
+    ;Heterogeneous Mechanical Properties
+        global g_pregrowth_layer_1 = 8e5
+        global g_pregrowth_layer_2 = 7.75e5
+        global g_pregrowth_layer_3 = 7.5e5
+        global g_pregrowth_layer_4 = 7.25e5
+        global g_pregrowth_layer_5 = 7e5
+        global g_pregrowth_layer_6 = 6.75e5
+        global g_pregrowth_layer_7 = 6.5e5
+        global g_pregrowth_layer_8 = 6.25e5
+        global g_pregrowth_layer_9 = 6e5
+        global g_pregrowth_layer_10 = 0
+    
+    ;Other Sediment Properties
+        global g_pb_rmul = 0.1
+        global g_dp_nratio = 0.7 ;0.6 0.7, 0.8
+        global g_pb_fa = 32.6
+    
+    global g_fault_wall_name = 'fault_wall'
+    global g_fault_wall_id = 5
+    ;global g_fault_dip_deg = 20 ; degrees
+    global g_fault_slip = 5 ; m
+    global g_slip_interval = 0.5 ;m
+    global g_fault_friction = 0.3
+    
+    ;global g_fault_dip_rad = g_fault_dip_deg * math.degrad
+    ;global g_fault_perpendicular_dip_rad = (g_fault_dip_deg - 90) * math.degrad
+    ;global g_cos_fault_dip_rad = math.cos(g_fault_dip_rad)
+    ;global g_sin_fault_dip_rad = math.sin(g_fault_dip_rad)
+    ;global g_fault_perpendicular_dip_rad_cos = math.cos(g_fault_perpendicular_dip_rad)
+    ;global g_fault_perpendicular_dip_rad_sin = math.sin(g_fault_perpendicular_dip_rad)
+    
+    ;global g_end_fault_x = g_x_piece_1_limit - g_fault_slip * g_cos_fault_dip_rad
+    ;global g_end_fault_y = g_y_model_begin - g_fault_slip * g_sin_fault_dip_rad
+    
+    ;New edit  
+        global g_fault_measure_1_name = 'measure_fault_1m'
+        global g_fault_measure_2_name = 'measure_fault_2m'
+        global g_fault_measure_3_name = 'measure_fault_3m'
+        global g_fault_measure_4_name = 'measure_fault_4m'
+        global g_fault_measure_5_name = 'measure_fault_5m'
+        global g_fault_measure_1_id = 6
+        global g_fault_measure_2_id = 7
+        global g_fault_measure_3_id = 8
+        global g_fault_measure_4_id = 9
+        global g_fault_measure_5_id = 10
+        global g_fault_measure_size = 0.2 ; m
+    
+        ;global g_begin_fault_measure_1_x1 = g_x_piece_1_limit - 1 * g_cos_fault_dip_rad
+        ;global g_begin_fault_measure_1_y1 = g_y_model_begin - 1 * g_sin_fault_dip_rad
+        ;global g_begin_fault_measure_2_x1 = g_x_piece_1_limit - 2 * g_cos_fault_dip_rad
+        ;global g_begin_fault_measure_2_y1 = g_y_model_begin - 2 * g_sin_fault_dip_rad
+        ;global g_begin_fault_measure_3_x1 = g_x_piece_1_limit - 3 * g_cos_fault_dip_rad
+        ;global g_begin_fault_measure_3_y1 = g_y_model_begin - 3 * g_sin_fault_dip_rad
+        ;global g_begin_fault_measure_4_x1 = g_x_piece_1_limit - 4 * g_cos_fault_dip_rad
+        ;global g_begin_fault_measure_4_y1 = g_y_model_begin - 4 * g_sin_fault_dip_rad
+        ;global g_begin_fault_measure_5_x1 = g_x_piece_1_limit - 5 * g_cos_fault_dip_rad
+        ;global g_begin_fault_measure_5_y1 = g_y_model_begin - 5 * g_sin_fault_dip_rad
+    
+        ;global g_end_fault_measure_1_x2 = g_begin_fault_measure_1_x1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_cos 
+        ;global g_end_fault_measure_1_y2 = g_begin_fault_measure_1_y1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_sin
+        ;global g_end_fault_measure_2_x2 = g_begin_fault_measure_2_x1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_cos
+        ;global g_end_fault_measure_2_y2 = g_begin_fault_measure_2_y1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_sin
+        ;global g_end_fault_measure_3_x2 = g_begin_fault_measure_3_x1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_cos
+        ;global g_end_fault_measure_3_y2 = g_begin_fault_measure_3_y1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_sin
+        ;global g_end_fault_measure_4_x2 = g_begin_fault_measure_4_x1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_cos
+        ;global g_end_fault_measure_4_y2 = g_begin_fault_measure_4_y1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_sin
+        ;global g_end_fault_measure_5_x2 = g_begin_fault_measure_5_x1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_cos
+        ;global g_end_fault_measure_5_y2 = g_begin_fault_measure_5_y1 - g_fault_measure_size * g_fault_perpendicular_dip_rad_sin
+    
+    ;global g_fault_seed_start_x = g_x_piece_1_limit  
+    ;global g_fault_seed_start_y = g_y_model_begin 
+    
+    ;global g_fault_seed_length = 2*(g_pre_growth_total_thickness / g_sin_fault_dip_rad)
+    ;NOTE: the fault seed is set to an origin and radiates outwards by 1/2 defined length 
+    ;global g_fault_seed_fraction = g_fault_seed_length * 0.5
+    ;Change the fault seed length by a fraction of the total sediment thickness
+    global g_width_fault_seed = g_ball_lower_radius_pre_growth * 0.01
+    
+    global g_wall_velocity_norm = 0.3 ; m/s
+    ;global g_moving_wall_x_velocity = g_wall_velocity_norm * g_cos_fault_dip_rad
+    ;global g_moving_wall_y_velocity = g_wall_velocity_norm * g_sin_fault_dip_rad
+    global g_forward_deformation_duration = g_fault_slip / g_wall_velocity_norm
+    global g_deformation_1m = g_slip_interval / g_wall_velocity_norm
+    global nb_deformation_steps = g_nb_growth_layers + 1
+    global g_all_moving_walls_group_name = 'moving_walls'
+end
+
+program return

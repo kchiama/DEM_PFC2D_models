@@ -1,0 +1,38 @@
+model new
+program thread auto
+
+;model restore 'unbonded'
+;model restore 'homogeneous_bounded'
+
+; The log file is useful to have a record of the simulation.
+; It also help to debug when PFC crashes (we can know what was the last step before the crash).
+program log on
+program log-file 'simulation_log.txt'
+[io.out('BEGINNING')]
+
+fish automatic-create off
+model random 10001
+
+program call 'parameter_def.p2dat' suppress
+program call 'fish_functions.p2fis' suppress
+plot 'particles' movie index 1 interval 500 
+plot 'contacts' movie index 1 interval 500 
+
+@allParameters
+;@exportResultSettings
+@makeDomain
+@makeWalls
+@defineDefaultContactMaterial
+@createPreGrowthLayers
+;@setHomogeneousMechanicalPropertiesBeforeDeformation
+;@setHeterogeneousMechanicalPropertiesBeforeDeformation
+;@setstrongwallfriction
+;@makeFault
+;@measureFault
+;@makeFaultSeed
+;@GroupMovingWalls
+;@runFixDeformation
+
+[io.out('END')]
+project save
+program return

@@ -1,0 +1,519 @@
+; Every single parameter uses SI unit.
+
+fish define exportResultSettings
+    if g_export_during_deformation = true then
+        command
+            ; Geometrical attributes (e.g., position, radius) and the id are by default saved
+            ball results active on add-attribute group
+            ;contact results active on add-attribute group
+            wall results active on add-attribute extra ; To have properties such as the wall friction
+        end_command
+    end_if
+end
+
+fish define makeDomain
+
+    command
+        model domain extent @g_x_domain_origin @g_x_domain_max @g_y_domain_origin @g_y_domain_max
+    end_command
+
+end
+
+fish define makeWalls
+    command
+        wall generate ...
+            name @g_vertical_wall_x_begin_name ...
+            id @g_vertical_wall_x_begin_id ...
+            plane ...
+            position (@g_x_model_begin,@g_y_model_begin) ...
+            dip 90
+        wall generate ...
+            name @g_vertical_wall_x_end_name ...
+            id @g_vertical_wall_x_end_id ...
+            plane ...
+            position (@g_x_model_end,@g_y_model_begin) ...
+            dip 90            
+        wall create ...
+            vertices ...
+            @g_x_model_begin @g_y_model_begin ...
+            @g_x_piece_1_limit @g_y_model_begin ...
+            name @g_horizonal_wall_y_begin_part_near_x_begin_name ...
+            id @g_horizonal_wall_y_begin_part_near_x_begin_id
+        wall create ...
+            vertices ...
+            @g_x_piece_1_limit @g_y_model_begin ...
+            @g_x_model_end @g_y_model_begin ...
+            name @g_horizonal_wall_y_begin_part_near_x_end_name ...
+            id @g_horizonal_wall_y_begin_part_near_x_end_id
+    end_command
+end
+
+fish define defineDefaultContactMaterial
+    command
+        cmat default model linear            ...
+            method deformability emod 1.0e9 kratio 1.0      ...
+            property dp_nratio 0.7
+    end_command
+end
+
+fish define settlement
+    command
+        model mechanical timestep scale
+        model gravity 0 -9.80665
+        model large-strain yes
+        model cycle 1000 calm 50
+        model solve ratio-average 1e-4
+    end_command
+end
+
+fish define getGlobalMaxTopo
+    local global_max_topo = g_y_model_begin
+    loop foreach local cur_ball ball.list
+        local cur_y = ball.pos.y(cur_ball)
+        if cur_y > global_max_topo then
+            global_max_topo = cur_y
+        end_if
+    end_loop
+    getGlobalMaxTopo = global_max_topo
+end
+
+fish define findBallsInBox(x_step_i,x_axis_discretization_step)
+    ; Defining the lower box corner y at g_y_domain_origin is safe but not optimized because we loop over a lot of unnecessary balls
+    local lower_box_corner = vector(x_step_i,g_y_domain_origin)
+    local upper_box_corner = vector(x_step_i + x_axis_discretization_step ,g_y_domain_max)
+    findBallsInBox = array.create(ball.inbox(lower_box_corner,upper_box_corner,false))
+    ;findBallsInBox = ball.inbox(lower_box_corner,upper_box_corner,false)
+end
+
+fish define getLocalMaxTopo(x_step_i,x_axis_discretization_step)
+
+    local balls_within_interval = findBallsInBox(x_step_i,x_axis_discretization_step)
+    local local_max_topo = g_y_model_begin
+
+    if array.size(balls_within_interval,1) = 0 then
+        getLocalMaxTopo = local_max_topo ; TO APPLY IN OTHER SCRIPT
+        exit
+    end_if
+
+    loop local ball_i (1,array.size(balls_within_interval,1))
+        local cur_ball = balls_within_interval(ball_i)
+        local cur_y = ball.pos.y(cur_ball)
+        if cur_y > local_max_topo then
+            local_max_topo = cur_y
+        end_if
+    end_loop
+    getLocalMaxTopo = local_max_topo
+end
+
+fish define endCriterionAddNewBalls(moving_wall_location,x_axis_discretization_step,target_topo,thickness_above_max_topo)
+    local should_we_continue = false
+    loop local x_step_i (moving_wall_location,g_x_model_end - x_axis_discretization_step,x_axis_discretization_step)
+
+        local local_max_topo = getLocalMaxTopo(x_step_i,x_axis_discretization_step)
+
+        ; Approximation that we expect all the topo is above the target topo
+        if local_max_topo < target_topo + g_coef_to_be_a_litte_above_target_topo*thickness_above_max_topo then
+            should_we_continue = true
+            exit loop
+        end_if
+    end_loop
+    endCriterionAddNewBalls = should_we_continue
+end
+
+fish define setBallDensity(ball_group)
+    command
+        ball attribute density @g_ball_density range group @ball_group
+    end_command
+end
+
+fish define addNewBallsSmallBoxInNewGrowthLayer(x_min,x_max,y_min,y_max,group_name,ball_lower_radius,ball_upper_radius,group_slot)
+    local modified_x_max = x_max
+    ; TODO maybe necessary but double-check these lines. It seems that it it never called
+    if modified_x_max > g_x_model_end then
+        modified_x_max = g_x_model_end
+    end_if
+    
+    if modified_x_max - x_min <= ball_upper_radius then
+        exit
+    end_if
+
+    ; I want to generate balls a little above the local top of the topography to avoid strong collision.
+    local box_shift = 3*ball_upper_radius
+    local modified_y_min = y_min + box_shift
+    
+    local modified_y_max = y_max + box_shift
+    if modified_y_max - modified_y_min < ball_upper_radius
+        modified_y_max = modified_y_min + ball_upper_radius
+    end_if
+
+    command
+        echo-line @x_min
+        echo-line @modified_x_max
+        echo-line @modified_y_min
+        echo-line @modified_y_max
+        ball distribute ...
+            porosity @g_ball_porosity ...
+            box @x_min @modified_x_max @modified_y_min @modified_y_max ...
+            radius [ball_lower_radius] [ball_upper_radius] ...
+            group @group_name slot @group_slot
+    end_command
+end
+
+fish define addNewBallsInNewGrowthLayer(moving_wall_location,thickness_above_max_topo,x_axis_discretization_step,target_topo,ball_lower_radius,ball_upper_radius,layer_name,group_slot)
+
+    ; PFC rounds the values so sometimes moving_wall_location + x*x_axis_discretization_step is a little (<1) above g_x_model_end - x_axis_discretization_step.
+    ; So I added a + 1 to be sure.
+    local end_loop_criterion = g_x_model_end - x_axis_discretization_step + 1
+    loop local x_step_i (moving_wall_location,end_loop_criterion,x_axis_discretization_step)
+        local local_max_topo = getLocalMaxTopo(x_step_i,x_axis_discretization_step)
+
+        ; Approximation that we expect all the topo is above the target topo
+        ; I think that we can define a better approximation based on the particle size and the horizontal box size
+        if local_max_topo > target_topo + 2*g_coef_to_be_a_litte_above_target_topo*thickness_above_max_topo then
+            continue
+        end_if
+        local local_thickness_to_add = target_topo - local_max_topo + 2*g_coef_to_be_a_litte_above_target_topo*thickness_above_max_topo
+        if local_thickness_to_add < 0 then
+            local_thickness_to_add = -1.0 * local_thickness_to_add ; a little weird....
+        end_if
+        addNewBallsSmallBoxInNewGrowthLayer(x_step_i,x_step_i + x_axis_discretization_step,local_max_topo,local_max_topo + local_thickness_to_add,layer_name,ball_lower_radius,ball_upper_radius,group_slot)
+    end_loop
+
+    command
+        ball attribute radius multiply @g_radius_multiplier range group @layer_name
+    end_command
+    setBallDensity(layer_name)
+    command
+        ball property 'fric' @g_initial_ball_friction range group @layer_name
+    end_command
+    
+    settlement
+end
+
+fish define doAddLayer(moving_wall_location,target_topo,thickness_above_max_topo,ball_lower_radius,ball_upper_radius,layer_name,group_slot)
+    local current_model_lenght = g_x_model_end - moving_wall_location
+    local nb_boxes = ((current_model_lenght) / (ball_upper_radius * 2.0 * 10.0))
+    local x_axis_discretization_step = current_model_lenght / nb_boxes
+
+    local should_we_continue = true
+    loop while should_we_continue = true
+        addNewBallsInNewGrowthLayer(moving_wall_location,thickness_above_max_topo,x_axis_discretization_step,target_topo,ball_lower_radius,ball_upper_radius,layer_name,group_slot)
+        should_we_continue = endCriterionAddNewBalls(moving_wall_location,x_axis_discretization_step,target_topo,thickness_above_max_topo)
+    end_loop
+end
+
+fish define isABallAboveTarget(target_topo)
+
+    local result = false
+    loop foreach local cur_ball ball.list
+        local cur_y = ball.pos.y(cur_ball)
+        if cur_y > target_topo then
+            result = true
+            exit loop
+        end_if
+    end_loop
+    isABallAboveTarget = result
+end
+
+fish define saveCurrentModelState(filename_without_extension)
+    command
+        model save [filename_without_extension]
+        model results export [filename_without_extension]
+    end_command
+end
+
+fish define makeUppermostLayerFlat(target_topo)
+    loop while isABallAboveTarget(target_topo) = true
+        io.out('before delete')
+        command
+            ball delete range position-y @target_topo @g_y_domain_max
+        end_command
+        io.out('after delete')
+        settlement
+    end_loop
+    saveCurrentModelState('eroded_sediment')
+    ;new edit, may not work
+end
+
+fish define addLayer(moving_wall_location,thickness_above_max_topo,ball_lower_radius,ball_upper_radius,layer_name,group_slot)
+    local global_max_topo = getGlobalMaxTopo
+    local target_topo = global_max_topo + thickness_above_max_topo
+    doAddLayer(moving_wall_location,target_topo,thickness_above_max_topo,ball_lower_radius,ball_upper_radius,layer_name,group_slot)
+    makeUppermostLayerFlat(target_topo)
+end
+
+
+fish define createPreGrowthLayers
+    ; Balls for all the pre-growth layers are generated at once and then groups are made to distinguish the different layers.
+    addLayer(g_x_model_begin,g_pre_growth_layer_thickness*g_nb_pre_growth_layers,g_ball_lower_radius_pre_growth,g_ball_upper_radius_pre_growth,'pre_growth', 'pre_growth')
+    
+    io.out('end add layer')
+    
+    loop local i (1,g_nb_pre_growth_layers)
+        command
+            ball group ['pre_growth_layer_' + string(i)] slot 'pre_growth' range position-y [g_y_model_begin + (i-1)*g_pre_growth_layer_thickness] [g_y_model_begin + i*g_pre_growth_layer_thickness]
+        end_command
+    end_loop
+    saveCurrentModelState('unbonded')
+end
+
+fish define setWallFriction(wall_id, friction)
+    command
+        wall property 'fric' @friction range id @wall_id
+        wall extra 1 [string(friction)] range id @wall_id ; This is to have the friction is the result files
+    end_command
+end
+
+;Homogeneous Sediment
+fish define setHomogeneousMechanicalPropertiesBeforeDeformation
+    command
+        contact model linearpbond range contact type 'ball-ball'
+        contact method deformability emod 1.0e9 kratio 1.0 range contact type 'ball-ball'
+        contact method pb_deformability emod 1e9 kratio 1.0 range contact type 'ball-ball'
+        contact property pb_ten @g_pre_growth_pb_ten pb_coh @g_pre_growth_pb_coh pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball'
+        contact property lin_force 0.0 0.0 lin_mode 1 range contact type 'ball-ball'
+        ball attribute force-contact multiply 0.0 moment-contact multiply 0.0
+        ball attribute displacement multiply 0.0
+        contact method bond gap @g_pre_growth_bond_gap range contact type 'ball-ball'
+        ball property 'fric' @g_pre_growth_ball_friction
+    end_command
+    settlement
+    saveCurrentModelState('homogeneous_bonded')
+end
+
+;Heterogeneous Sediment
+fish define setHeterogeneousMechanicalPropertiesBeforeDeformation
+    command
+        contact model linearpbond range contact type 'ball-ball'
+        ;contact model linear range contact type 'ball-ball' position-x [g_x_piece_1_limit - 2*g_ball_upper_radius_pre_growth] [g_x_piece_1_limit + 2*g_ball_upper_radius_pre_growth] position-y @g_y_model_begin [g_y_model_begin + 4*g_ball_upper_radius_pre_growth]
+        contact method deformability emod 1.0e9 kratio 1.0 range contact type 'ball-ball'
+        contact method pb_deformability emod 1e9 kratio 1.0 range contact type 'ball-ball'
+        contact property pb_ten @g_pregrowth_layer_1 pb_coh @g_pregrowth_layer_1 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_1'
+        contact property pb_ten @g_pregrowth_layer_2 pb_coh @g_pregrowth_layer_2 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_2'
+        contact property pb_ten @g_pregrowth_layer_3 pb_coh @g_pregrowth_layer_3 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_3'
+        contact property pb_ten @g_pregrowth_layer_4 pb_coh @g_pregrowth_layer_4 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_4'
+        contact property pb_ten @g_pregrowth_layer_5 pb_coh @g_pregrowth_layer_5 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_5'
+        contact property pb_ten @g_pregrowth_layer_6 pb_coh @g_pregrowth_layer_6 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_6'
+        contact property pb_ten @g_pregrowth_layer_7 pb_coh @g_pregrowth_layer_7 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_7'
+        contact property pb_ten @g_pregrowth_layer_8 pb_coh @g_pregrowth_layer_8 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_8'
+        contact property pb_ten @g_pregrowth_layer_9 pb_coh @g_pregrowth_layer_9 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_9'
+        contact property pb_ten @g_pregrowth_layer_10 pb_coh @g_pregrowth_layer_10 pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group 'pre_growth_layer_10'
+        ;contact property pb_ten 1e20 pb_coh 1e20 pb_rmul 0.8 dp_nratio 0.7 pb_fa 32.6 range contact type 'ball-facet'
+        contact property lin_force 0.0 0.0 lin_mode 1 range contact type 'ball-ball'
+        ball attribute force-contact multiply 0.0 moment-contact multiply 0.0
+        ball attribute displacement multiply 0.0
+        contact method bond gap @g_pre_growth_bond_gap range contact type 'ball-ball'
+        ball property 'fric' @g_pre_growth_ball_friction
+    end_command 
+    settlement
+    saveCurrentModelState('heterogeneous_bonded')
+end
+
+fish define setstrongwallfriction
+    setWallFriction(g_vertical_wall_x_begin_id, g_vertical_wall_x_begin_friction)
+    setWallFriction(g_vertical_wall_x_end_id, g_vertical_wall_x_end_friction)
+    setWallFriction(g_horizonal_wall_y_begin_part_near_x_begin_id, g_horizonal_wall_y_begin_part_near_x_begin_friction)
+    setWallFriction(g_horizonal_wall_y_begin_part_near_x_end_id, g_horizonal_wall_y_begin_part_near_x_end_friction)
+end
+
+fish define bondGrowthLayer(layer_name)
+    command
+        contact model linearpbond range contact type 'ball-ball' group @layer_name
+        contact method bond gap @g_growth_bond_gap range contact type 'ball-ball' group @layer_name
+        contact method deformability emod 1.0e9 kratio 1.0 range contact type 'ball-ball' group @layer_name
+        contact method pb_deformability emod 1e9 kratio 1.0 range contact type 'ball-ball' group @layer_name
+        contact property pb_ten @g_growth_pb_ten pb_coh @g_growth_pb_coh pb_rmul @g_pb_rmul dp_nratio @g_dp_nratio pb_fa @g_pb_fa range contact type 'ball-ball' group @layer_name
+        ball property 'fric' @g_growth_ball_friction range group @layer_name
+        contact property lin_force 0.0 0.0 lin_mode 1 range contact type 'ball-ball' group @layer_name
+        ball attribute force-contact multiply 0.0 moment-contact multiply 0.0 range group @layer_name
+        ball attribute displacement multiply 0.0 range group @layer_name
+    end_command
+
+    settlement
+end
+
+;fish define makeFault
+;    if domain.min(1) > g_end_fault_x then
+;        domain.min(1) = g_end_fault_x - g_x_positive_distance_from_domain_origin
+;    end_if
+;    if domain.min(2) < g_end_fault_y then
+;        domain.min(2) = g_end_fault_y - g_y_positive_distance_from_domain_origin
+;    end_if
+;
+;    command
+;        wall create ...
+;            vertices ...
+;            @g_x_piece_1_limit @g_y_model_begin ...
+;            @g_end_fault_x @g_end_fault_y ...
+;            name @g_fault_wall_name ...
+;            id @g_fault_wall_id
+;    end_command
+;       
+;    setWallFriction(g_fault_wall_id, g_fault_friction)
+;end
+
+;fish define measureFault
+;    command 
+;        wall create vertices ...
+;            @g_begin_fault_measure_1_x1 @g_begin_fault_measure_1_y1 ...
+;            @g_end_fault_measure_1_x2 @g_end_fault_measure_1_y2 ...
+;            name @g_fault_measure_1_name ...
+;            id @g_fault_measure_1_id
+;        wall create vertices ...
+;            @g_begin_fault_measure_2_x1 @g_begin_fault_measure_2_y1 ...
+;            @g_end_fault_measure_2_x2 @g_end_fault_measure_2_y2 ...
+;            name @g_fault_measure_2_name...
+;            id @g_fault_measure_2_id
+;        wall create vertices ...
+;            @g_begin_fault_measure_3_x1 @g_begin_fault_measure_3_y1 ...
+;            @g_end_fault_measure_3_x2 @g_end_fault_measure_3_y2 ...
+;            name @g_fault_measure_3_name ...
+;            id @g_fault_measure_3_id
+;        wall create vertices ...
+;            @g_begin_fault_measure_4_x1 @g_begin_fault_measure_4_y1 ...
+;            @g_end_fault_measure_4_x2 @g_end_fault_measure_4_y2 ...
+;            name @g_fault_measure_4_name ...
+;            id @g_fault_measure_4_id
+;        wall create vertices ...
+;            @g_begin_fault_measure_5_x1 @g_begin_fault_measure_5_y1 ...
+;            @g_end_fault_measure_5_x2 @g_end_fault_measure_5_y2 ...
+;            name @g_fault_measure_5_name...
+;            id @g_fault_measure_5_id
+;    end_command
+;end
+
+fish define GroupMovingWalls
+    command
+        wall group @g_all_moving_walls_group_name ...
+            range id-list @g_fault_wall_id @g_vertical_wall_x_begin_id @g_horizonal_wall_y_begin_part_near_x_begin_id @g_fault_measure_1_id @g_fault_measure_2_id @g_fault_measure_3_id @g_fault_measure_4_id @g_fault_measure_5_id
+    end_command
+end 
+
+;fish define makeFaultSeed
+    
+;    command
+;        fracture create position (@g_fault_seed_start_x,@g_fault_seed_start_y) dip [180 - g_fault_dip_deg] size [g_fault_seed_fraction]
+;        fracture property 'sj_kn' 2e9 'sj_ks' 2e9 'sj_fric' 0.3 'sj_coh' 0.0 'sj_ten' 0.0 'sj_large' 1
+;        fracture contact-model model 'smoothjoint' install dist [g_width_fault_seed]
+;        fracture contact-model model 'smoothjoint' activate
+;    end_command
+;end
+
+fish define activateExportResultDuringDeformation
+    command
+        model results interval step @g_time_between_two_export warn off
+        model results index 1
+        ;contact property pb_state on
+        ;ball results active on add-attribute damp 
+        ;ball results active on add-attribute density 
+        ball results active on add-attribute displacement 
+        ;ball results active on add-attribute energy-body 
+        ;ball results active on add-attribute energy-damp 
+        ;ball results active on add-attribute energy-kinetic 
+        ;ball results active on add-attribute extra 
+        ball results active on add-attribute force-applied 
+        ball results active on add-attribute force-contact 
+        ball results active on add-attribute force-unbalanced
+        ball results active on add-attribute group
+        ball results active on add-attribute id 
+        ball results active on add-attribute mass 
+        ;ball results active on add-attribute mass-inertial 
+        ;ball results active on add-attribute moi 
+        ;ball results active on add-attribute moi-inertial 
+        ;ball results active on add-attribute moment-applied 
+        ;ball results active on add-attribute moment-contact 
+        ;ball results active on add-attribute moment-unbalanced 
+        ball results active on add-attribute position 
+        ball results active on add-attribute radius 
+        ball results active on add-attribute rotation 
+        ;ball results active on add-attribute stress-prin-max 
+        ;ball results active on add-attribute stress-prin-min 
+        ;ball results active on add-attribute stress-xx 
+        ;ball results active on add-attribute stress-xy 
+        ;ball results active on add-attribute stress-yy 
+        ball results active on add-attribute velocity 
+        ;ball results active on add-attribute volume
+        wall results active on add-attribute extra 
+        wall results active on add-attribute group
+        ;wall results active on add-attribute cutoff-angle
+        wall results active on add-attribute displacement
+        wall results active on add-attribute force-contact
+        ;wall results active on add-attribute fragment
+        ;wall results active on add-attribute moment-contact
+        ;wall results active on add-attribute normal-facet
+        wall results active on add-attribute position
+        ;wall results active on add-attribute position-facet
+        wall results active on add-attribute velocity
+       ; wall results active on add-attribute velocity-conveyor
+        ;wall results active on add-attribute velocity-facet; To have properties such as the wall friction
+    end_command
+end
+
+fish define resetMechanicalTime
+    command
+        model mechanical time-total 0.0
+    end_command
+end
+
+fish define runFixDeformation
+    resetMechanicalTime
+    if g_export_during_deformation = true then
+        activateExportResultDuringDeformation
+    end_if
+    local nb_deformation_steps = g_nb_growth_layers + 1
+    ;loop local time_i (1,nb_deformation_steps)
+        saveCurrentModelState('deformation_state_0m')
+        command
+            model mechanical timestep fix 3e-5
+            ;model solve time [g_forward_deformation_duration / nb_deformation_steps]
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_0,5m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_1m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_1,5m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_2m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_2,5m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_3m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_3,5m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_4m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_4,5m')
+        command
+            model solve time [g_deformation_1m / nb_deformation_steps]
+        end_command 
+        saveCurrentModelState('deformation_state_5m')
+        command
+            ; Solve to an equilibrium state again
+            wall attribute velocity-x 0.0
+            wall attribute velocity-y 0.0
+        end_command
+        settlement
+    ;end_loop
+    
+    saveCurrentModelState('last_deformation_stage')
+end
+
+program return
