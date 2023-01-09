@@ -3,7 +3,7 @@ General code for DEM models using Particle Flow Code (PFC2D) v7.00. These models
 
 You will need to download PFC2D v7.0 or later to open these files and obtain an Itasca license for the software to run models with > 1000 particles. 
 
-Run the "run.pfc2d" file first to generate sediment followed by the "homogenous.py" file to run a series of models with varying fault geometry and sediment strength mechanics. 
+Call the "run.p2dvr" file first to generate sediment followed by the "homogenous.py" file to run a series of models with varying fault geometry and sediment strength mechanics. 
 
 I will upload CSV files of the particle locations for the 45 trials in a few days.
 
