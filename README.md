@@ -5,7 +5,7 @@ You will need to download PFC2D v7.0 or later to open these files and obtain an 
 
 Call the "run.p2dvr" file first to generate sediment followed by the "homogenous.py" file to run a series of models with varying fault geometry and sediment strength mechanics. "D5" is the main project file where D = Dense sediment, and 5 = 5.0 m thick. 
 
-I will upload CSV files of the particle locations for the 45 trials in a few days.
+The CSV files contain the X,Y values of particle positions after every 0.5 m of slip for each of the 45 trials presented in the manuscript. The "Trials_Dataset" contains a summary of the 45 trials with the DEM micro-properties and surface deformation characteristics (vertical displacement, deformation zone width, fault scarp dip angle) that are measured from the CSVs of particle positions. 
 
 # README.txt
 Each set of project files contains everything required to reproduce a model in Particle Flow Code (PFC2D) version 7.00.152 or later. 
