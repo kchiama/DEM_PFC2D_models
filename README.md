@@ -1,6 +1,8 @@
 # DEM_PFC2D_models
 General code for DEM models using Particle Flow Code (PFC2D) v7.00. These models are part of the "Geomechanical modeling of ground surface deformation associated with thrust and reverse fault earthquakes: A distinct element approach" project. 
 
+Citation: Kristen Chiama, Benjamin Chauvin, Andreas Plesch, Robb Moss, John H. Shaw; Geomechanical Modeling of Ground Surface Deformation Associated with Thrust and Reverse‐Fault Earthquakes: A Distinct Element Approach. Bulletin of the Seismological Society of America 2023; doi: https://doi.org/10.1785/0120220264
+
 You will need to download PFC2D v7.0 or later to open these files and obtain an Itasca license for the software to run models with > 1000 particles. 
 
 Call the "run.p2dvr" file first to generate sediment followed by the "homogenous.py" file to run a series of models with varying fault geometry and sediment strength mechanics. "D5" is the main project file where D = Dense sediment, and 5 = 5.0 m thick. 
